@@ -1,81 +1,85 @@
+import sys
 import json
-import os
+import urllib.request
+import urllib.error
 
-def get_tasks():
-    # FIXED: 'exists' spelled correctly
-    if os.path.exists('tasks.json'):
-        with open('tasks.json', 'r') as file:
-            # FIXED: removed quotes around file
-            return json.load(file)
+def fetch_activity(username):
+
+    url = f"https://api.github.com/users/{username}/events"
+    
+    try:
+        # FIX 2: It is urllib.request (no 's')
+        # FIX 3: Added 'with' keyword
+        with urllib.request.urlopen(url) as response:
+            # FIX 4: Spelling 'decode' correctly
+            data = json.loads(response.read().decode('utf-8'))
+            return data
+            
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            print(f"Error: User '{username}' not found.")
+        elif e.code == 403:
+            print("Error: Rate limit exceeded. Try again later.")
+        else:
+            print(f"Error: API returned status code {e.code}")
+        return None
+    except urllib.error.URLError as e:
+        print(f"Error: Network problem. ({e.reason})")
+        return None
+
+def format_event(event):
+ 
+    event_type = event['type']
+    repo_name = event['repo']['name']
+
+    if event_type == "PushEvent":
+   
+        count = len(event['payload']['commits'])
+        return f"Pushed {count} commits to {repo_name}"
+        
+  
+    elif event_type == "WatchEvent":
+        return f"Starred {repo_name}"
+        
+    elif event_type == "ForkEvent":
+        return f"Forked {repo_name}"
+        
+    elif event_type == "CreateEvent":
+     
+        ref_type = event['payload']['ref_type']
+        return f"Created {ref_type} in {repo_name}"
+        
+    elif event_type == "PullRequestEvent":
+        action = event['payload']['action']
+        return f"{action.capitalize()} a pull request in {repo_name}"
+        
     else:
-        return []
+        return f"{event_type} in {repo_name}"
 
-# FIXED: Moved to the far Left (un-indented)
-def save_tasks(tasks):
-    with open('tasks.json', 'w') as file:
-        json.dump(tasks, file, indent=2)
-
-# FIXED: Moved to the far Left (un-indented)
 def main():
-    while True:
-        print("\nHello, enter your tasks")
-        print("1- add task")
-        print("2- list tasks")
-        print("3- delete tasks")
-        print("4- exit")
+    if len(sys.argv) < 2:
+        print("Usage: python github_activity.py <username>")
+        return
 
-        choice = input("enter choice (1-4): ")
+    username = sys.argv[1]
+    
+    events = fetch_activity(username)
+    
+    if not events:
+        return
 
-        if choice == '1':
-            description = input("what is the task? ")
-            
-            # FIXED: Added () to actually run the function
-            tasks = get_tasks() 
+    for event in events:
+        try:
+            message = format_event(event)
+            print(f"- {message}")
+        except KeyError:
+            continue
 
-            new_id = 1
-            if len(tasks) > 0:
-                new_id = tasks[-1]['id'] + 1
+if __name__ == "__main__":
+    main()
 
-            new_task = {
-                'id': new_id,
-                'description': description,
-                'status': 'todo'
-            }
-            tasks.append(new_task)
-            
-            # FIXED: Added (tasks) to pass the data to the function
-            save_tasks(tasks)
-            print("save tasks")
+              
 
-        elif choice == '2':
-            # FIXED: Added ()
-            tasks = get_tasks()
-            print("\n your tasks")
-            for task in tasks:
-                # FIXED: formatting of the f-string
-                print(f"{task['id']}. [{task['status']}] {task['description']}")
-
-        elif choice == '3':
-            # FIXED: Added ()
-            tasks = get_tasks()
-            id_to_delete = int(input("enter id to delete: "))
-            
-            # FIXED: Added '=' so the change is actually saved to the variable
-            tasks = [t for t in tasks if t['id'] != id_to_delete]
-            
-            # FIXED: Added (tasks)
-            save_tasks(tasks)
-            print("task deleted")
-
-        elif choice == '4':
-            print('Goodbye')
-            break
-
-# FIXED: Moved to the far Left
-main()
-
-
-            
 
 
 
